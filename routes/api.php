@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ComplaintController;
 use App\Http\Controllers\PaymentController;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
+use App\Models\Payment;
 
 // web.php أو api.php
 Route::get('/governorates/{id}/centers', function ($id) {
@@ -55,9 +58,13 @@ Route::group([],function () {
     Route::post('sub-services/update/{id}', [SubServiceController::class, 'update']);
 
     Route::post('/complaint/store', [ComplaintController::class, 'store']);
-    Route::post('/paymob/webhook', [ComplaintController::class, 'handleWebhook'])->name('paymob.webhook');
+    Route::post('/complaint/callback', [ComplaintController::class, 'callback']);
+
+    // Route::post('/paymob/webhook', [ComplaintController::class, 'handleWebhook'])->name('paymob.webhook');
 
     Route::post('/document/store', [DocumentController::class, 'store']);
+    Route::post('/documents/payment-callback', [DocumentController::class, 'callback']);
+
 
     // Routes for Questions
     Route::get('questions', [QuestionController::class, 'index']);
@@ -112,3 +119,55 @@ Route::group([],function () {
     Route::delete('center-governorates/{id}', [CenterGovernorateController::class, 'destroy']);
 });
     Route::get('delete_account', [AuthController::class, 'delete_account']);
+
+
+
+
+
+// Route::post('/payment/callback', function (Request $request) {
+//     Log::info('🔔 Webhook Received:', $request->all());
+
+//     $data = $request->all();
+
+//     $merchantOrderId = $data['obj']['order']['merchant_order_id'] ?? null;
+//     $paymobOrderId = $data['obj']['order']['id'] ?? null;
+//     $amountCents = $data['obj']['amount_cents'] ?? 0;
+//     $status = $data['success'] ? 'paid' : 'failed';
+
+//     if ($merchantOrderId) {
+//         // Create payment record
+//         Payment::create([
+//             'type' => 'complaint', // أو 'document' حسب حالتك
+//             'related_id' => $merchantOrderId,
+//             'paymob_order_id' => $paymobOrderId,
+//             'amount' => $amountCents / 100, // حول من cents إلى جنيه
+//             'status' => $status,
+//         ]);
+
+//         // Example: update complaint
+//         if ($status === 'paid') {
+//             \App\Models\Complaint::where('id', $merchantOrderId)->update([
+//                 'is_paid' => true
+//             ]);
+//         }
+//     }
+
+//     return response()->json(['message' => 'تم الاستلام']);
+// });
+
+
+
+Route::post('/payment/callback', function (Request $request) {
+    $validated = $request->validate([
+        'type' => 'required|in:complaint,document',
+        'related_id' => 'required|integer',
+        'paymob_order_id' => 'nullable|string',
+        'paymob_payment_token' => 'nullable|string',
+        'amount' => 'required|numeric',
+        'status' => 'nullable|string',
+    ]);
+
+    $payment = Payment::create($validated);
+
+    return response()->json($payment);
+});

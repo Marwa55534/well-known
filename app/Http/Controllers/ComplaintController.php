@@ -8,6 +8,7 @@ use App\Models\Attachment;
 use App\Models\Payment;
 use App\Services\PaymobPaymentService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ComplaintController extends Controller
 {
@@ -56,66 +57,185 @@ class ComplaintController extends Controller
     // }
 
 
-    public function store(Request $request, PaymobPaymentService $paymob)
-    {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'files' => 'array|max:5',
-            'files.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:2048',
-            'amount' => 'required|numeric|min:1',
+    // git
+    // public function store(Request $request, PaymobPaymentService $paymob)
+    // {
+    //     $request->validate([
+    //         'title' => 'required|string|max:255',
+    //         'description' => 'required|string',
+    //         'files' => 'array|max:5',
+    //         'files.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:2048',
+    //         'amount' => 'required|numeric|min:1',
+    //     ]);
+
+    //     DB::beginTransaction();
+    //     try {
+    //         $complaint = Complaint::create($request->only('title', 'description'));
+
+    //         if ($request->hasFile('files')) {
+    //             foreach ($request->file('files') as $file) {
+    //                 $path = $file->store('complaints', 'public');
+    //                 Attachment::create([
+    //                     'complaint_id' => $complaint->id,
+    //                     'file_path' => $path,
+    //                 ]);
+    //             }
+    //         }
+
+    //         $authToken = $paymob->authenticate();
+    //         $amount = $request->input('amount');
+    //         $orderId = $paymob->createOrder($authToken, $amount, $complaint->id);
+    //         $paymentToken = $paymob->getPaymentKey($authToken, $amount, $orderId);
+
+    //         Payment::create([
+    //             'complaint_id' => $complaint->id,
+    //             'payment_token' => $paymentToken,
+    //             'amount' => $amount,
+    //             'status' => 'pending',
+    //         ]);
+
+    //         DB::commit();
+
+    //         if ($request->expectsJson()) {
+    //             return response()->json(['payment_url' => $paymob->getIframeUrl($paymentToken)], 200);
+    //         }
+
+    //         return redirect()->away($paymob->getIframeUrl($paymentToken));
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return response()->json(['error' => 'Failed to process complaint or payment: ' . $e->getMessage()], 500);
+    //     }
+    // }
+
+    // public function handleWebhook(Request $request)
+    // {
+    //     $data = $request->all();
+    //     if ($data['obj']['success']) {
+    //         Payment::where('payment_token', $data['obj']['payment_key'])
+    //             ->update(['status' => 'completed']);
+    //     } else {
+    //         Payment::where('payment_token', $data['obj']['payment_key'])
+    //             ->update(['status' => 'failed']);
+    //     }
+    //     return response()->json(['status' => 'success']);
+    // }
+
+    
+// public function store(Request $request, PaymobPaymentService $paymob)
+// {
+//     $request->validate([
+//         'title' => 'required|string|max:255',
+//         'description' => 'required|string',
+//         'files' => 'array|max:5',
+//         'files.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:2048',
+//         'amount' => 'required|numeric|min:1',
+//     ]);
+
+//     DB::beginTransaction();
+
+//     try {
+//         $complaint = Complaint::create($request->only('title', 'description'));
+
+//         if ($request->hasFile('files')) {
+//             foreach ($request->file('files') as $file) {
+//                 $path = $file->store('complaints', 'public');
+//                 Attachment::create([
+//                     'complaint_id' => $complaint->id,
+//                     'file_path' => $path,
+//                 ]);
+//             }
+//         }
+
+//         // Paymob Integration
+//         $authToken = $paymob->getToken();
+//         $order = $paymob->createOrder($authToken, $request->amount, 'complaint_'.$complaint->id); 
+//         $paymentToken = $paymob->generatePaymentKey($authToken, $request->amount, $order['id']);
+
+//         DB::commit();
+
+//         // Redirect to iframe
+//         $iframeId = config('paymob.iframe_id');
+//         $paymentUrl = "https://accept.paymob.com/api/acceptance/iframes/{$iframeId}?payment_token={$paymentToken}";
+
+//         return redirect($paymentUrl);
+
+//     } catch (\Exception $e) {
+//         DB::rollBack();
+//         return back()->with('error', 'حدث خطأ أثناء إنشاء الشكوى أو عملية الدفع.');
+//     }
+// }
+
+public function store(Request $request, PaymobPaymentService $paymob)
+{
+    $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'required|string',
+        'files' => 'array|max:5',
+        'files.*' => 'file|mimes:jpg,jpeg,png,pdf,doc,docx|max:2048',
+        'amount' => 'required|numeric|min:1',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        $complaint = Complaint::create($request->only('title', 'description','amount'));
+
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                $path = $file->store('complaints', 'public');
+                Attachment::create([
+                    'complaint_id' => $complaint->id,
+                    'file_path' => $path,
+                ]);
+            }
+        }
+
+        // Paymob Integration
+        $authToken = $paymob->getToken();
+        $order = $paymob->createOrder($authToken, $request->amount, 'complaint_'.$complaint->id); 
+        $paymentToken = $paymob->generatePaymentKey($authToken, $request->amount, $order['id']);
+
+        $complaint->update([
+            'payment_order_id' => $order['id'],
+            'payment_token' => $paymentToken,
         ]);
+        DB::commit();
 
-        DB::beginTransaction();
-        try {
-            $complaint = Complaint::create($request->only('title', 'description'));
+        $iframeId = config('paymob.iframe_id');
+        $paymentUrl = "https://accept.paymob.com/api/acceptance/iframes/{$iframeId}?payment_token={$paymentToken}";
 
-            if ($request->hasFile('files')) {
-                foreach ($request->file('files') as $file) {
-                    $path = $file->store('complaints', 'public');
-                    Attachment::create([
-                        'complaint_id' => $complaint->id,
-                        'file_path' => $path,
-                    ]);
-                }
-            }
+        return response()->json([
+            'payment_url' => $paymentUrl,
+            'message' => 'تم إنشاء الشكوى بنجاح. برجاء التوجه إلى رابط الدفع.',
+            'complaint_id' => $complaint->id,
+        ], 201);
 
-            $authToken = $paymob->authenticate();
-            $amount = $request->input('amount');
-            $orderId = $paymob->createOrder($authToken, $amount, $complaint->id);
-            $paymentToken = $paymob->getPaymentKey($authToken, $amount, $orderId);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'error' => 'حدث خطأ أثناء إنشاء الشكوى أو عملية الدفع.',
+            'details' => $e->getMessage()
+        ], 500);
+    }
+}
 
-            Payment::create([
-                'complaint_id' => $complaint->id,
-                'payment_token' => $paymentToken,
-                'amount' => $amount,
-                'status' => 'pending',
-            ]);
+public function callback(Request $request)
+{
+    Log::info('Callback Data:', $request->all());
 
-            DB::commit();
+    if ($request->has('success') && $request->input('success') == 'true') {
+        $complaint = Complaint::where('payment_order_id', $request->input('merchant_order_id'))->first();
 
-            if ($request->expectsJson()) {
-                return response()->json(['payment_url' => $paymob->getIframeUrl($paymentToken)], 200);
-            }
+        if ($complaint && !$complaint->is_paid) {
+        $complaint->update(['is_paid' => 1]);
 
-            return redirect()->away($paymob->getIframeUrl($paymentToken));
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => 'Failed to process complaint or payment: ' . $e->getMessage()], 500);
-        }
+        return response()->json(['message' => 'Payment recorded'], 200);
     }
 
-    public function handleWebhook(Request $request)
-    {
-        $data = $request->all();
-        if ($data['obj']['success']) {
-            Payment::where('payment_token', $data['obj']['payment_key'])
-                ->update(['status' => 'completed']);
-        } else {
-            Payment::where('payment_token', $data['obj']['payment_key'])
-                ->update(['status' => 'failed']);
-        }
-        return response()->json(['status' => 'success']);
+        return response()->json(['message' => 'Complaint not found'], 404);
     }
+
+    return response()->json(['message' => 'Payment failed'], 400);
+}
 
 }

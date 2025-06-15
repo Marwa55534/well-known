@@ -6,10 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class Document extends Model
 {
-    protected $fillable = ['title', 'description'];
+    protected $fillable = ['title', 'description','amount','payment_order_id','payment_token','is_paid'];
     
-        public function extractFiles()
+    public function extractFiles(){
+        return $this->hasMany(ExtractFile::class);
+    }
+
+public function payment()
 {
-    return $this->hasMany(ExtractFile::class);
+    return $this->morphOne(Payment::class, 'related', 'type', 'related_id');
 }
 }

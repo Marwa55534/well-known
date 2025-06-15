@@ -13,11 +13,15 @@ return new class extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('complaint_id')->constrained()->onDelete('cascade');
-            $table->string('payment_token');
-            $table->decimal('amount', 10, 2);
-            $table->string('status')->default('pending');
+            $table->string('type'); // 'complaint' or 'document'
+           $table->unsignedBigInteger('related_id'); // complaint_id or document_id
+           $table->string('paymob_order_id')->nullable();
+           $table->string('paymob_payment_token')->nullable();
+           $table->decimal('amount', 10, 2);
+           $table->string('status')->default('pending'); 
             $table->timestamps();
+
+            $table->index(['type', 'related_id']);
         });
     }
 

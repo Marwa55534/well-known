@@ -6,15 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class Complaint extends Model
 {
-    protected $fillable = ['title', 'description'];
+    protected $fillable = ['title', 'description','amount','is_paid','payment_order_id','payment_token'];
 
     public function files()
 {
     return $this->hasMany(Attachment::class);
 }
 
-public function payments()
+
+public function payment()
 {
-    return $this->hasMany(Payment::class);
+    return $this->morphOne(Payment::class, 'related', 'type', 'related_id');
 }
 }

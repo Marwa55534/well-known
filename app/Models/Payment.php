@@ -6,10 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Payment extends Model
 {
-    protected $fillable = ['complaint_id', 'payment_token', 'amount','status'];
-    
-    public function complaint()
-    {
-        return $this->belongsTo(Complaint::class);
-    }
+    protected $fillable = [
+      'type',
+    'related_id',
+    'paymob_order_id',
+    'paymob_payment_token',
+    'amount',
+    'status',
+];
+
+    public function related()
+{
+    return $this->morphTo();
+}
 }

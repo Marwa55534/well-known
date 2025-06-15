@@ -54,9 +54,9 @@ $subService->image = !empty($subService->image) ? url($subService->image) : null
             'service_id' => 'required|exists:services,id',
             'governorate_id' => 'required|exists:governorates,id',
             // 'center_governorate_id' => 'required|exists:center_governorates,id',
-            // 'center_governorate_id.*' => 'exists:center_governorates,id',
-            'center_governorate_id' => 'required|array|min:1',
-        'center_governorate_id.*' => 'exists:center_governorates,id',
+            // 'center_governorate_id' => 'required|array|min:1', 
+            'center_governorate_id.*' => 'required|exists:center_governorates,id',
+
         ]);
 
         $imagePath = $request->file('image')->store('sub_service_images', 'public');
@@ -70,36 +70,26 @@ $subService->image = !empty($subService->image) ? url($subService->image) : null
             'service_id' => $request->service_id,
             'image' => $imagePath,
            'governorate_id' => $request->governorate_id,
-        //    'center_governorate_id' => $request->center_governorate_id,
-            'center_governorate_id' => $request->center_governorate_id[0], // عشان أول مركز يتخزن في الجدول الرئيسي
-
-
+            // 'center_governorate_id' => $request->center_governorate_id, 
+            'center_governorate_id' => $request->center_governorate_id[0], 
         ]);
 
-        // foreach ($request->center_governorate_id as $id) {
-        //     SubServiceGovernment::create([
-        //         'sub_service_id' => $subService->id,
-        //         'center_governorate_id' => $id,
-        //         'government_id' => $request->governorate_id,
-        //     ]);
-        // } 
 
-         if($subService){
-            $center_governorate_id=$request->center_governorate_id;
-            // return $center_governorate_id;
-            foreach($center_governorate_id as $id){
-                $new_center=SubServiceGovernment::create([
-                        'sub_service_id'=>$subService->id,
-                        'center_governorate_id'=>$id,
-                        'government_id'=>$request->governorate_id,
-                    ]);
-            }
+
+        foreach ($request->center_governorate_id as $center_id) {
+    SubServiceGovernment::create([
+        'sub_service_id' => $subService->id,
+        'government_id' => $request->governorate_id,
+        'center_governorate_id' => $center_id,
+    ]);
         }
+   
+       
 
         $subService->load(['governorate', 'centerGovernorate']);
-
         return $this->formatResponse($subService, 'Sub-service created successfully', true, 201);
-    }
+    
+    } 
 
     // public function update(Request $request, $id)
     // {
